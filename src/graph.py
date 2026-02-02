@@ -138,7 +138,14 @@ ONE WORD: BOOK, CANCEL, RESCHEDULE, FAQ, or GENERAL"""
 
 
 def booking_collect_identity(state: AgentState) -> AgentState:
-    """Extract name and email from conversation. Don't overwrite if already collected."""
+    """
+    Extract user's name and email from conversation history.
+    
+    Strategy:
+    1. Check state for existing identity.
+    2. Try regex extraction for "name email" patterns.
+    3. Use LLM extraction if regex fails or is ambiguous.
+    """
 
     # If we already have both, skip extraction
     if state.get("user_name") and state.get("user_email"):
@@ -218,7 +225,11 @@ IMPORTANT:
 
 
 def ask_for_time_preference(state: AgentState) -> AgentState:
-    """Ask user for their preferred day or time."""
+    """
+    Prompt user for a preferred day or time.
+    
+    Sets 'asked_for_preference' flag to True to track conversation state.
+    """
     msg = (
         "Do you have a preferred day or time for your appointment? "
         "For example, 'Tuesday afternoon' or 'Wednesday morning'. Or just say 'any' if you're flexible!"
@@ -227,7 +238,16 @@ def ask_for_time_preference(state: AgentState) -> AgentState:
 
 
 def parse_time_preference(state: AgentState) -> AgentState:
-    """Parse user's time preference: extract days and specific/general time."""
+    """
+    Parse natural language time preferences into structured data.
+    
+    Extracts:
+    - Days of week (Monday, Tuesday...)
+    - Specific hours (11am, 2pm)
+    - General times (morning, afternoon, evening)
+    
+    Falls back to 'any' if input is ambiguous like "anytime".
+    """
     last_user_msg = next((m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None)
     if not last_user_msg:
         return state
@@ -314,7 +334,15 @@ def ask_for_name_email(state: AgentState) -> AgentState:
 
 
 def booking_check_availability(state: AgentState) -> AgentState:
-    """Check slots and filter by preference with clear fallback messaging."""
+    """
+    Fetch slots from Calendly and filter based on user preferences.
+    
+    Logic:
+    1. Fetch all available slots for the event type.
+    2. Parse 'time_preference' string (e.g. "monday,tuesday|morning").
+    3. Filter slots to find Exact Matches and Fallback Matches.
+    4. Limit results to preventing overwhelming the user.
+    """
     try:
         from datetime import datetime
 
@@ -426,7 +454,14 @@ def booking_check_availability(state: AgentState) -> AgentState:
 
 
 def parse_slot_selection(state: AgentState) -> AgentState:
-    """Parse user's slot selection from their message."""
+    """
+    Parse user input to identify selected slot number.
+    
+    Handles:
+    - Valid integer input (1-N): Sets 'selected_slot'.
+    - Invalid integer (out of range): Returns error message to retry.
+    - Text input (e.g. "actually tuesday"): Clears 'available_slots' to trigger re-parsing of preference.
+    """
     last_user_msg = next((m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None)
     if not last_user_msg or not state.get("available_slots"):
         return state
@@ -452,7 +487,15 @@ def parse_slot_selection(state: AgentState) -> AgentState:
 
 
 def booking_create(state: AgentState) -> AgentState:
-    """Create the booking via Calendly."""
+    """
+    Execute the booking creation via Calendly API.
+    
+    Features:
+    - Validates required fields (slot, name, email).
+    - Creates the new appointment.
+    - If in RESCHEDULE flow, attempts to cancel the old appointment ('selected_event_uri').
+    - Returns success message and resets flow to IDLE.
+    """
     if not state.get("selected_slot") or not state.get("user_name") or not state.get("user_email"):
         return {**state, "booking_stage": "ERROR", "error": "Missing required information for booking"}
 
@@ -508,7 +551,17 @@ def confirm_booking(state: AgentState) -> AgentState:
 
 
 def lookup_events(state: AgentState) -> AgentState:
-    """Look up scheduled events for Cancel or Reschedule flow."""
+    """
+    Search for existing appointments for Cancel/Reschedule flows.
+    
+    Logic:
+    1. Identify lookup email (New input > Stored lookup > User profile).
+    2. If missing, prompt user to provide email.
+    3. Call Calendly API to list scheduled events.
+    4. Handle valid bookings (1 or multiple) or failure (suggest retry).
+    
+    CRITICAL: Does NOT auto-select single event anymore (waits for explicit confirmation).
+    """
     flow = state.get("flow")
     
     # Check for new email in user message first (allows correction)
@@ -584,7 +637,17 @@ def lookup_events(state: AgentState) -> AgentState:
 
 
 def select_event(state: AgentState) -> AgentState:
-    """Process user selection of appointment to cancel/reschedule."""
+    """
+    Process user selection from a list of looked-up appointments.
+    
+    Handles:
+    - Yes/No confirmation for single booking.
+    - Number selection (1-N) for multiple bookings.
+    - Sets 'selected_event_uri' upon valid selection.
+    - Transitions flow:
+      - CANCEL -> confirm_action
+      - RESCHEDULE -> booking flow (clears old slots/preferences)
+    """
     last_user_msg = next((m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None)
     if not last_user_msg:
         return state

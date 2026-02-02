@@ -5,12 +5,13 @@ from datetime import datetime
 from typing import Annotated, Literal, TypedDict
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
 from src.calendly_client import CalendlyClient
 from src.tools import create_booking, retrieve_faq
+from src.llm import get_llm
+
 
 
 class AgentState(TypedDict):
@@ -105,7 +106,7 @@ def router(state: AgentState) -> AgentState:
         if any(keyword in content_lower for keyword in book_keywords):
             return {**state, "intent": "BOOK", "flow": "BOOK"}
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = get_llm(temperature=0)
 
     system_prompt = """Classify user intent:
 - BOOK: mentions booking, appointment, slots, availability
@@ -172,7 +173,7 @@ def booking_collect_identity(state: AgentState) -> AgentState:
         if name_part and len(name_part) > 2:
             regex_name = name_part
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = get_llm(temperature=0)
 
     system_prompt = """Extract ONLY the user's full name and email address from the conversation.
 
@@ -779,7 +780,7 @@ def handle_faq(state: AgentState) -> AgentState:
         context = retrieve_faq.invoke({"query": last_user_msg.content})
 
         # Generate response with context
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+        llm = get_llm(temperature=0.3)
         system_prompt = f"""You are a helpful assistant for Acme Dental clinic.
 
 Use the following knowledge base information to answer the user's question:
@@ -802,7 +803,7 @@ def respond_to_user(state: AgentState) -> AgentState:
     if not last_user_msg:
         return state
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+    llm = get_llm(temperature=0.3)
     system_prompt = """You are a concise dental receptionist for Acme Dental.
 
 Respond in 1-2 sentences MAX. Be friendly but brief.

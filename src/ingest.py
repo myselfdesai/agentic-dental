@@ -1,20 +1,22 @@
 import os
 import time
+
 from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from pinecone import Pinecone, ServerlessSpec
 
+
 def ingest_knowledge_base():
     load_dotenv()
-    
+
     file_path = "KNOWLEDGE_BASE.md"
     if not os.path.exists(file_path):
         print(f"File {file_path} not found.")
         return
 
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         text = f.read()
 
     headers_to_split_on = [
@@ -33,7 +35,7 @@ def ingest_knowledge_base():
         print("PINECONE_API_KEY not found in environment variables")
         return
 
-    index_name = "acme-dental-index" 
+    index_name = "acme-dental-index"
 
     pc = Pinecone(api_key=pinecone_api_key)
 
@@ -44,10 +46,7 @@ def ingest_knowledge_base():
         print(f"Creating index {index_name}...")
         try:
             pc.create_index(
-                name=index_name,
-                dimension=1536,
-                metric="cosine",
-                spec=ServerlessSpec(cloud="aws", region="us-east-1")
+                name=index_name, dimension=1536, metric="cosine", spec=ServerlessSpec(cloud="aws", region="us-east-1")
             )
             while not pc.describe_index(index_name).status["ready"]:
                 time.sleep(1)
@@ -58,7 +57,7 @@ def ingest_knowledge_base():
     print("Upserting to Pinecone...")
     try:
         embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-        
+
         PineconeVectorStore.from_documents(
             documents=md_header_splits,
             embedding=embeddings,
@@ -67,6 +66,7 @@ def ingest_knowledge_base():
         print("Ingestion complete.")
     except Exception as e:
         print(f"Error during upsert: {e}")
+
 
 if __name__ == "__main__":
     ingest_knowledge_base()

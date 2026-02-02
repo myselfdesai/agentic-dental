@@ -9,12 +9,12 @@ from src.agent import create_acme_dental_agent
 def main():
     load_dotenv()
     agent = create_acme_dental_agent()
-    
+
     print("🦷 Acme Dental AI Agent")
     print("=" * 50)
     print("Welcome! I can help you book appointments or answer questions about our clinic.")
     print("Type 'exit', 'quit', or 'q' to end the session.\n")
-    
+
     # Initialize persistent state for the conversation
     state = {
         "messages": [],
@@ -26,11 +26,15 @@ def main():
         "asked_for_preference": False,
         "selected_slot": None,
         "available_slots": None,
-        "error": None
+        "error": None,
+        "cancel_email": None,
+        "cancel_bookings": None,
+        "selected_cancel_event": None,
+        "cancel_confirmed": False,
     }
-    
+
     last_printed_count = 0  # Track how many messages we've printed
-    
+
     while True:
         user_input = input("You: ")
         if user_input.lower() in ["exit", "quit", "q"]:
@@ -40,14 +44,14 @@ def main():
         try:
             # Append new user message to existing conversation
             state["messages"].append(HumanMessage(content=user_input))
-            
+
             # Invoke the graph with the current state
             result = agent.invoke(state)
-            
+
             # Update state with results, preserving collected information
             state["messages"] = result.get("messages", state["messages"])
             state["intent"] = result.get("intent", state["intent"])
-            
+
             # Preserve user info and booking data once collected
             if result.get("user_name"):
                 state["user_name"] = result["user_name"]
@@ -61,19 +65,29 @@ def main():
                 state["selected_slot"] = result["selected_slot"]
             if result.get("available_slots"):
                 state["available_slots"] = result["available_slots"]
-            
+
+            # Cancel flow state persistence
+            if result.get("cancel_email"):
+                state["cancel_email"] = result["cancel_email"]
+            if result.get("cancel_bookings"):
+                state["cancel_bookings"] = result["cancel_bookings"]
+            if result.get("selected_cancel_event"):
+                state["selected_cancel_event"] = result["selected_cancel_event"]
+            if result.get("cancel_confirmed") is not None:
+                state["cancel_confirmed"] = result["cancel_confirmed"]
+
             state["error"] = result.get("error")
-            
+
             # Print only NEW AI messages (delta)
             messages = state["messages"]
             new_messages = messages[last_printed_count:]
-            
+
             for msg in new_messages:
                 if isinstance(msg, AIMessage):
                     print(f"\nAgent: {msg.content}\n")
-            
+
             last_printed_count = len(messages)
-                
+
         except Exception as e:
             print(f"\n❌ Error: {e}\n")
 

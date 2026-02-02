@@ -9,9 +9,8 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
 from src.calendly_client import CalendlyClient
-from src.tools import create_booking, retrieve_faq
 from src.llm import get_llm
-
+from src.tools import create_booking, retrieve_faq
 
 
 class AgentState(TypedDict):
@@ -43,7 +42,7 @@ class AgentState(TypedDict):
 def check_existing_flow(state: AgentState) -> AgentState:
     """Entry node - check if we're already in a booking flow."""
     flow = state.get("flow", "IDLE")
-    
+
     # If IDLE, standard routing applies
     if flow == "IDLE":
         return state
@@ -52,29 +51,29 @@ def check_existing_flow(state: AgentState) -> AgentState:
     last_user_msg = next((m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None)
     if last_user_msg:
         content_lower = last_user_msg.content.lower()
-        
+
         # Keywords (must match router logic)
         cancel_keywords = ["cancel", "cancellation", "delete", "remove"]
         book_keywords = ["book", "appointment", "schedule", "slot", "available", "checkup", "check-up"]
-        
+
         new_flow = None
         new_intent = None
-        
+
         # Check CANCEL
         if any(keyword in content_lower for keyword in cancel_keywords):
             new_flow = "CANCEL"
             new_intent = "CANCEL"
-            
+
         # Check RESCHEDULE (params override Book)
         elif "reschedule" in content_lower or "change" in content_lower or "move" in content_lower:
             new_flow = "RESCHEDULE"
             new_intent = "RESCHEDULE"
-            
+
         # Check BOOK
         elif any(keyword in content_lower for keyword in book_keywords):
             new_flow = "BOOK"
             new_intent = "BOOK"
-            
+
         # If we detected a valid flow change, apply it
         if new_flow and new_flow != flow:
             # We specifically want to allow switching, so we return the new state
@@ -101,7 +100,7 @@ def router(state: AgentState) -> AgentState:
         # Check RESCHEDULE before BOOK to prevent "schedule" keyword conflict
         # "reschedule" contains "schedule", so specific check first
         if "reschedule" in content_lower or "change" in content_lower or "move" in content_lower:
-             return {**state, "intent": "RESCHEDULE", "flow": "RESCHEDULE"}
+            return {**state, "intent": "RESCHEDULE", "flow": "RESCHEDULE"}
 
         if any(keyword in content_lower for keyword in book_keywords):
             return {**state, "intent": "BOOK", "flow": "BOOK"}
@@ -141,7 +140,7 @@ ONE WORD: BOOK, CANCEL, RESCHEDULE, FAQ, or GENERAL"""
 def booking_collect_identity(state: AgentState) -> AgentState:
     """
     Extract user's name and email from conversation history.
-    
+
     Strategy:
     1. Check state for existing identity.
     2. Try regex extraction for "name email" patterns.
@@ -228,7 +227,7 @@ IMPORTANT:
 def ask_for_time_preference(state: AgentState) -> AgentState:
     """
     Prompt user for a preferred day or time.
-    
+
     Sets 'asked_for_preference' flag to True to track conversation state.
     """
     msg = (
@@ -241,12 +240,12 @@ def ask_for_time_preference(state: AgentState) -> AgentState:
 def parse_time_preference(state: AgentState) -> AgentState:
     """
     Parse natural language time preferences into structured data.
-    
+
     Extracts:
     - Days of week (Monday, Tuesday...)
     - Specific hours (11am, 2pm)
     - General times (morning, afternoon, evening)
-    
+
     Falls back to 'any' if input is ambiguous like "anytime".
     """
     last_user_msg = next((m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None)
@@ -258,7 +257,6 @@ def parse_time_preference(state: AgentState) -> AgentState:
     # Check if user says "any"
     if any(word in user_input for word in ["any", "anytime", "flexible"]):
         return {**state, "time_preference": "any"}
-
 
     # Extract ALL days mentioned
     days_map = {
@@ -337,7 +335,7 @@ def ask_for_name_email(state: AgentState) -> AgentState:
 def booking_check_availability(state: AgentState) -> AgentState:
     """
     Fetch slots from Calendly and filter based on user preferences.
-    
+
     Logic:
     1. Fetch all available slots for the event type.
     2. Parse 'time_preference' string (e.g. "monday,tuesday|morning").
@@ -457,7 +455,7 @@ def booking_check_availability(state: AgentState) -> AgentState:
 def parse_slot_selection(state: AgentState) -> AgentState:
     """
     Parse user input to identify selected slot number.
-    
+
     Handles:
     - Valid integer input (1-N): Sets 'selected_slot'.
     - Invalid integer (out of range): Returns error message to retry.
@@ -490,7 +488,7 @@ def parse_slot_selection(state: AgentState) -> AgentState:
 def booking_create(state: AgentState) -> AgentState:
     """
     Execute the booking creation via Calendly API.
-    
+
     Features:
     - Validates required fields (slot, name, email).
     - Creates the new appointment.
@@ -515,10 +513,7 @@ def booking_create(state: AgentState) -> AgentState:
             try:
                 # Cancel the old event
                 client = CalendlyClient()
-                _ = client.cancel_event(
-                    state["selected_event_uri"],
-                    reason="Rescheduled to new time"
-                )
+                _ = client.cancel_event(state["selected_event_uri"], reason="Rescheduled to new time")
                 reschedule_msg = "\n\n♻️ Your previous appointment has been successfully cancelled."
             except Exception as e:
                 reschedule_msg = (
@@ -550,30 +545,30 @@ def confirm_booking(state: AgentState) -> AgentState:
     return state
 
 
-
 def lookup_events(state: AgentState) -> AgentState:
     """
     Search for existing appointments for Cancel/Reschedule flows.
-    
+
     Logic:
     1. Identify lookup email (New input > Stored lookup > User profile).
     2. If missing, prompt user to provide email.
     3. Call Calendly API to list scheduled events.
     4. Handle valid bookings (1 or multiple) or failure (suggest retry).
-    
+
     CRITICAL: Does NOT auto-select single event anymore (waits for explicit confirmation).
     """
     flow = state.get("flow")
-    
+
     # Check for new email in user message first (allows correction)
     last_user_msg = next((m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None)
     new_email = None
     if last_user_msg:
         import re
+
         email_pattern = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
         emails = re.findall(email_pattern, last_user_msg.content)
         if emails:
-             new_email = emails[0]
+            new_email = emails[0]
 
     # Prioritize new email, then stored lookup, then user profile
     email = new_email or state.get("lookup_email") or state.get("user_email")
@@ -584,6 +579,7 @@ def lookup_events(state: AgentState) -> AgentState:
             return state
 
         import re
+
         email_pattern = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
         emails = re.findall(email_pattern, last_user_msg.content)
 
@@ -599,9 +595,9 @@ def lookup_events(state: AgentState) -> AgentState:
         bookings = client.list_scheduled_events(email)
 
         if not bookings:
-             msg = f"I couldn't find any upcoming appointments for {email}."
-             # Don't persist invalid email if we just found it
-             return {**state, "messages": [AIMessage(content=msg)], "lookup_email": None if new_email else email}
+            msg = f"I couldn't find any upcoming appointments for {email}."
+            # Don't persist invalid email if we just found it
+            return {**state, "messages": [AIMessage(content=msg)], "lookup_email": None if new_email else email}
 
         # Format bookings
         booking_list = []
@@ -617,7 +613,7 @@ def lookup_events(state: AgentState) -> AgentState:
         action_prompt = "cancel" if flow == "CANCEL" else "reschedule"
 
         if len(bookings) == 1:
-            appt_time = booking_list[0].split('. ', 1)[1]
+            appt_time = booking_list[0].split(". ", 1)[1]
             msg = f"Found your appointment on **{appt_time}**.\n\nIs this the one you want to {action_prompt}? (Yes/No)"
         else:
             msg = "Found these appointments:\n\n" + "\n".join(booking_list)
@@ -640,7 +636,7 @@ def lookup_events(state: AgentState) -> AgentState:
 def select_event(state: AgentState) -> AgentState:
     """
     Process user selection from a list of looked-up appointments.
-    
+
     Handles:
     - Yes/No confirmation for single booking.
     - Number selection (1-N) for multiple bookings.
@@ -675,44 +671,40 @@ def select_event(state: AgentState) -> AgentState:
                 msg = f"Please choose a number between 1 and {len(bookings)}."
                 return {**state, "messages": [AIMessage(content=msg)]}
         except ValueError:
-             msg = f"Please reply with a number (1-{len(bookings)}) to select the appointment."
-             return {**state, "messages": [AIMessage(content=msg)]}
+            msg = f"Please reply with a number (1-{len(bookings)}) to select the appointment."
+            return {**state, "messages": [AIMessage(content=msg)]}
 
     if selected_booking:
         uri = selected_booking["uri"]
 
         if flow == "CANCEL":
             # Ask for final confirmation
-             start_time = selected_booking.get("start_time", "")
-             try:
+            start_time = selected_booking.get("start_time", "")
+            try:
                 dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
                 formatted_time = dt.strftime("%A, %B %d at %I:%M %p")
-             except Exception:
+            except Exception:
                 formatted_time = start_time
 
-             msg = f"You selected: {formatted_time}\n\nAre you sure you want to cancel this appointment? (Yes/No)"
-             return {
-                 **state,
-                 "messages": [AIMessage(content=msg)],
-                 "selected_event_uri": uri
-             }
+            msg = f"You selected: {formatted_time}\n\nAre you sure you want to cancel this appointment? (Yes/No)"
+            return {**state, "messages": [AIMessage(content=msg)], "selected_event_uri": uri}
 
         elif flow == "RESCHEDULE":
-             # Transition to booking flow
-             user_name = selected_booking.get("name") or state.get("user_name")
-             msg = (
-                 "Got it. I will cancel the old one only AFTER we confirm the new one.\n\n"
-                 "When would you like to reschedule this to? (e.g. 'Tuesday morning' or 'Feb 5th')"
-             )
-             return {
-                 **state,
-                 "messages": [AIMessage(content=msg)],
-                 "selected_event_uri": uri,
-                 "user_name": user_name,
-                 "time_preference": None,
-                 "available_slots": None,
-                 "selected_slot": None,
-             }
+            # Transition to booking flow
+            user_name = selected_booking.get("name") or state.get("user_name")
+            msg = (
+                "Got it. I will cancel the old one only AFTER we confirm the new one.\n\n"
+                "When would you like to reschedule this to? (e.g. 'Tuesday morning' or 'Feb 5th')"
+            )
+            return {
+                **state,
+                "messages": [AIMessage(content=msg)],
+                "selected_event_uri": uri,
+                "user_name": user_name,
+                "time_preference": None,
+                "available_slots": None,
+                "selected_slot": None,
+            }
 
     return state
 
@@ -741,7 +733,7 @@ def confirm_action(state: AgentState) -> AgentState:
                 "intent": None,
                 "matched_events": None,
                 "selected_event_uri": None,
-                "confirmed": True
+                "confirmed": True,
             }
         except Exception as e:
             msg = f"Error cancelling appointment: {str(e)}"
@@ -753,20 +745,12 @@ def confirm_action(state: AgentState) -> AgentState:
             "messages": [AIMessage(content=msg)],
             "flow": "IDLE",
             "intent": None,
-             "matched_events": None,
-             "selected_event_uri": None
+            "matched_events": None,
+            "selected_event_uri": None,
         }
 
+
 # Remove old nodes
-
-
-
-
-
-
-
-
-
 
 
 def handle_faq(state: AgentState) -> AgentState:
@@ -830,21 +814,16 @@ def tool_error_handler(state: AgentState) -> AgentState:
 def route_from_entry(
     state: AgentState,
 ) -> Literal[
-    "router",
-    "booking_collect_identity",
-    "lookup_events",
-    "select_event",
-    "confirm_action",
-    "ask_for_time_preference"
+    "router", "booking_collect_identity", "lookup_events", "select_event", "confirm_action", "ask_for_time_preference"
 ]:
     """Entry point routing based on flow and intent."""
     flow = state.get("flow", "IDLE")
     intent = state.get("intent")
-    
+
     # If we are in an active flow, route accordingly
     if flow == "BOOK":
         return "booking_collect_identity"
-    
+
     if flow == "CANCEL":
         # If we have selected an event, we are waiting for confirmation
         if state.get("selected_event_uri"):
@@ -854,18 +833,18 @@ def route_from_entry(
             return "select_event"
         # Otherwise start lookup
         return "lookup_events"
-        
+
     if flow == "RESCHEDULE":
         # If we have selected event, proceed to new booking details
         if state.get("selected_event_uri"):
-            # If we already have a slot selected, we might be in booking creation, 
+            # If we already have a slot selected, we might be in booking creation,
             # but usually entry point routing implies we are waiting for user input.
             # We route to booking controller to handle identity check and next steps.
             return "booking_collect_identity"
-            
+
         if state.get("matched_events"):
             return "select_event"
-            
+
         return "lookup_events"
 
     # IDLE flow - check intent from previous turn or default to router
@@ -882,12 +861,7 @@ def route_from_entry(
 
 def route_after_router(
     state: AgentState,
-) -> Literal[
-    "handle_faq",
-    "booking_collect_identity",
-    "lookup_events",
-    "respond_to_user"
-]:
+) -> Literal["handle_faq", "booking_collect_identity", "lookup_events", "respond_to_user"]:
     """Route based on classified intent."""
     intent = state.get("intent", "GENERAL")
 
@@ -954,11 +928,11 @@ def route_after_slot_selection(state: AgentState) -> Literal["booking_create", "
     """Route after slot selection attempt."""
     if state.get("selected_slot"):
         return "booking_create"
-    
+
     # If slots were cleared (because user typed text), go re-parse preference
     if state.get("available_slots") is None:
         return "parse_time_preference"
-        
+
     # If no valid selection but slots exist (and we sent error msg), END
     return "__end__"
 
@@ -968,11 +942,8 @@ def route_after_lookup(state: AgentState) -> Literal["__end__"]:
     # Always wait for user input (confirmation or selection)
     return "__end__"
 
-def route_after_selection(state: AgentState) -> Literal[
-    "ask_for_time_preference",
-    "confirm_action",
-    "__end__"
-]:
+
+def route_after_selection(state: AgentState) -> Literal["ask_for_time_preference", "confirm_action", "__end__"]:
     """Route based on flow after event selection."""
     flow = state.get("flow")
     if not state.get("selected_event_uri"):

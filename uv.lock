@@ -14,6 +14,7 @@ source = { editable = "." }
 dependencies = [
     { name = "httpx" },
     { name = "langchain", extra = ["anthropic"] },
+    { name = "langchain-anthropic" },
     { name = "langchain-community" },
     { name = "langchain-openai" },
     { name = "langchain-pinecone" },
@@ -37,6 +38,7 @@ dev = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "langchain", extras = ["anthropic"], specifier = ">=0.3.0" },
+    { name = "langchain-anthropic", specifier = ">=0.1.0" },
     { name = "langchain-community", specifier = ">=0.0.10" },
     { name = "langchain-openai", specifier = ">=0.1.0" },
     { name = "langchain-pinecone", specifier = ">=0.1.0" },

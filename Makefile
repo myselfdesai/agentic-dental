@@ -21,4 +21,4 @@ run: ## Run the agent
 	uv run python src/main.py
 
 test: ## Run tests
-	uv run pytest
+	uv run python tests/eval_router.py

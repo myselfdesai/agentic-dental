@@ -57,6 +57,11 @@ The agent must support the following core booking operations:
 - Be aware that API integrations (e.g. Calendly) may be unreliable or experience delays.
 - Document your architectural decisions
 
+## Documentation
+
+- [Graph Design Doc](docs/agent_flow.md) - Architecture and State Machine logic.
+- [Developer Guide](docs/developer_guide.md) - Setup, API Keys, and Running instructions.
+
 ## Getting Started
 
 ### Prerequisites

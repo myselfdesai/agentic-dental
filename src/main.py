@@ -19,7 +19,7 @@ def main():
     state = {
         "messages": [],
         "intent": None,
-        "booking_stage": "IDLE",
+        "flow": "IDLE",
         "user_name": None,
         "user_email": None,
         "time_preference": None,
@@ -27,10 +27,10 @@ def main():
         "selected_slot": None,
         "available_slots": None,
         "error": None,
-        "cancel_email": None,
-        "cancel_bookings": None,
-        "selected_cancel_event": None,
-        "cancel_confirmed": False,
+        "lookup_email": None,
+        "matched_events": None,
+        "selected_event_uri": None,
+        "confirmed": False,
     }
 
     last_printed_count = 0  # Track how many messages we've printed
@@ -66,15 +66,17 @@ def main():
             if result.get("available_slots"):
                 state["available_slots"] = result["available_slots"]
 
-            # Cancel flow state persistence
-            if result.get("cancel_email"):
-                state["cancel_email"] = result["cancel_email"]
-            if result.get("cancel_bookings"):
-                state["cancel_bookings"] = result["cancel_bookings"]
-            if result.get("selected_cancel_event"):
-                state["selected_cancel_event"] = result["selected_cancel_event"]
-            if result.get("cancel_confirmed") is not None:
-                state["cancel_confirmed"] = result["cancel_confirmed"]
+            # Persist unified flow state
+            state["flow"] = result.get("flow", "IDLE")
+
+            if result.get("lookup_email"):
+                state["lookup_email"] = result["lookup_email"]
+            if result.get("matched_events"):
+                state["matched_events"] = result["matched_events"]
+            if result.get("selected_event_uri"):
+                state["selected_event_uri"] = result["selected_event_uri"]
+            if result.get("confirmed") is not None:
+                state["confirmed"] = result["confirmed"]
 
             state["error"] = result.get("error")
 

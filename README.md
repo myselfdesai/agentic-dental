@@ -1,8 +1,6 @@
-# Acme Dental AI Agent
+# Dental AI Agent
 
-## Your Task
-
-Build an AI agent that allow users to book dental check-up appointments with a fictitious Acme Dental clinic through natural language conversation in a chat interface.
+Build an AI agent that allow users to book dental check-up appointments with a fictitious  Dental clinic through natural language conversation in a chat interface.
 
 ### The clinic
 
@@ -13,13 +11,11 @@ Acme Dental is a simple dental practice that offers routine check-up appointment
 - **Appointment Duration**: 30 minutes
 - **Staff**: Only 1 dentist
 - **Scheduling System**: Calendly
-  - Calendar URL: Provided in the email.
-  - Calendly Token: Provided in the email.
-  - Use the Calendly API to check availability and manage bookings
 
-### Functional Requirements
 
-The agent must support the following core booking operations:
+### Functional
+
+The agent support the following core booking operations:
 
 **1. Create New Bookings**
 - Greet users and understand their booking intent
@@ -50,19 +46,6 @@ The agent must support the following core booking operations:
 - Extract and process information from the docu to build a searchable knowledge basent
 - Answer frequently asked questions about the clinic using information from the KB
 
-### Non Functional Requirements
-
-- Implement the agent using [LangGraph](https://docs.langchain.com/oss/python/langgraph/overview)
-- You are free to choose the LLM model(s) or combination of models you consider most appropriate for this task
-- Be aware that API integrations (e.g. Calendly) may be unreliable or experience delays.
-- Document your architectural decisions
-
-## Documentation
-
-- [Graph Design Doc](docs/agent_flow.md) - Architecture and State Machine logic.
-- [Developer Guide](docs/developer_guide.md) - Setup, API Keys, and Running instructions.
-
-## Getting Started
 
 ### Prerequisites
 
